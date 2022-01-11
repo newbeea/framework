@@ -1,6 +1,7 @@
 import type { ServerResponse } from 'http'
 import { createRenderer } from 'vue-bundle-renderer'
 import devalue from '@nuxt/devalue'
+import createEtag from 'etag'
 import { privateConfig, publicConfig } from './config'
 // @ts-ignore
 import htmlTemplate from '#build/views/document.template.mjs'
@@ -122,6 +123,22 @@ export async function renderMiddleware (req, res: ServerResponse) {
 
   const error = ssrContext.nuxt && ssrContext.nuxt.error
   res.statusCode = error ? error.statusCode : 200
+  
+  // Add Cache-Control and Etag headers for cache server
+  if (publicConfig.app.cacheControl) {
+    res.setHeader('Cache-Control', publicConfig.app.cacheControl);
+  }
+  if (publicConfig.app.etag) {
+    const etag = createEtag(data);
+    const ifMatch = req.headers['if-none-match'] === etag
+    if (ifMatch) {
+      res.statusCode = 304
+      return res.end('Not Modified (etag)')
+    } else {
+      res.setHeader("Etag", etag);
+    }
+  }
+
   res.end(data, 'utf-8')
 }
 
